@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ankiweb-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "Headless command-line interface for AnkiWeb"
 license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
