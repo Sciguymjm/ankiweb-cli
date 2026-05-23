@@ -1,4 +1,4 @@
-from anki_cli.cli import main
+from ankiweb_cli.cli import main
 
 if __name__ == "__main__":
     main()

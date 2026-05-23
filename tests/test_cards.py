@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from anki_cli.collection import open_collection
-from anki_cli.commands.cards import list_cards
+from ankiweb_cli.collection import open_collection
+from ankiweb_cli.commands.cards import list_cards
 
 from anki.notes import Note
 

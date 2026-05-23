@@ -1,6 +1,6 @@
 from click.testing import CliRunner
 
-from anki_cli.cli import main
+from ankiweb_cli.cli import main
 
 
 def test_cli_runs_with_no_args() -> None:

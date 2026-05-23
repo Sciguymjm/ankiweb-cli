@@ -10,7 +10,7 @@ import keyring
 from anki.collection import Collection
 from anki.sync_pb2 import SyncAuth, SyncCollectionResponse
 
-SERVICE = "anki-cli"
+SERVICE = "ankiweb-cli"
 
 
 def store_password(username: str, password: str) -> None:
@@ -34,7 +34,7 @@ def login_and_get_hkey(
     username: str, password: str, endpoint: str
 ) -> tuple[str, str]:
     """Authenticate with AnkiWeb. Returns (hkey, endpoint)."""
-    with tempfile.TemporaryDirectory(prefix="anki-cli-login-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="ankiweb-cli-login-") as tmp:
         tmp_col_path = Path(tmp) / "throwaway.anki2"
         col = Collection(str(tmp_col_path))
         try:

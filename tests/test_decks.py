@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from anki_cli.collection import open_collection
-from anki_cli.commands.decks import list_decks
+from ankiweb_cli.collection import open_collection
+from ankiweb_cli.commands.decks import list_decks
 
 
 def test_list_decks_returns_default(tmp_path: Path) -> None:

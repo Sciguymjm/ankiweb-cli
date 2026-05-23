@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from anki_cli.collection import open_collection
+from ankiweb_cli.collection import open_collection
 
 
 def test_open_creates_collection_file(tmp_path: Path) -> None:

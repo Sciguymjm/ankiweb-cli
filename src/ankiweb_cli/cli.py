@@ -4,14 +4,14 @@ import sys
 
 import click
 
-from anki_cli import sync as sync_mod
-from anki_cli.collection import open_collection
-from anki_cli.commands.audit import audit_collection
-from anki_cli.commands.cards import list_cards
-from anki_cli.commands.decks import list_decks
-from anki_cli.config import Config, load_config, save_config
-from anki_cli.output import emit
-from anki_cli.paths import BACKUPS_DIR, COLLECTION_FILE, CONFIG_FILE, ensure_dirs
+from ankiweb_cli import sync as sync_mod
+from ankiweb_cli.collection import open_collection
+from ankiweb_cli.commands.audit import audit_collection
+from ankiweb_cli.commands.cards import list_cards
+from ankiweb_cli.commands.decks import list_decks
+from ankiweb_cli.config import Config, load_config, save_config
+from ankiweb_cli.output import emit
+from ankiweb_cli.paths import BACKUPS_DIR, COLLECTION_FILE, CONFIG_FILE, ensure_dirs
 
 
 @click.group()
@@ -22,7 +22,7 @@ def main() -> None:
 
 @main.group()
 def config() -> None:
-    """View and edit anki-cli config."""
+    """View and edit ankiweb-cli config."""
 
 
 @config.command("show")
@@ -49,7 +49,7 @@ def login() -> None:
     ensure_dirs()
     cfg = load_config(CONFIG_FILE)
     if not cfg.username:
-        raise click.ClickException("Run `anki-cli config set username <email>` first.")
+        raise click.ClickException("Run `ankiweb-cli config set username <email>` first.")
     password = getpass.getpass("AnkiWeb password: ")
     _, endpoint = sync_mod.login_and_get_hkey(cfg.username, password, cfg.endpoint)
     sync_mod.store_password(cfg.username, password)
@@ -69,10 +69,10 @@ def sync_cmd(full: str | None) -> None:
     ensure_dirs()
     cfg = load_config(CONFIG_FILE)
     if not cfg.username:
-        raise click.ClickException("Not configured. Run `anki-cli login` first.")
+        raise click.ClickException("Not configured. Run `ankiweb-cli login` first.")
     password = sync_mod.get_password(cfg.username)
     if not password:
-        raise click.ClickException("No password in keyring. Run `anki-cli login`.")
+        raise click.ClickException("No password in keyring. Run `ankiweb-cli login`.")
     hkey, endpoint = sync_mod.login_and_get_hkey(
         cfg.username, password, cfg.endpoint
     )

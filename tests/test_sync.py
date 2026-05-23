@@ -1,4 +1,4 @@
-from anki_cli import sync
+from ankiweb_cli import sync
 
 
 def test_keyring_store_and_get(monkeypatch) -> None:

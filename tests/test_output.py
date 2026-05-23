@@ -1,7 +1,7 @@
 import io
 import json
 
-from anki_cli.output import emit
+from ankiweb_cli.output import emit
 
 
 def test_emit_json_when_not_tty() -> None:

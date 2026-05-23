@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from anki_cli.config import Config, load_config, save_config
+from ankiweb_cli.config import Config, load_config, save_config
 
 
 def test_save_and_load_roundtrip(tmp_path: Path) -> None:

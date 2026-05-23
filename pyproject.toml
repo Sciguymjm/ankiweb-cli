@@ -3,9 +3,12 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "anki-cli"
+name = "ankiweb-cli"
 version = "0.1.0"
-description = "Headless CLI for AnkiWeb, optimized for agent use"
+description = "Headless command-line interface for AnkiWeb"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "anki>=24.0",
@@ -18,7 +21,7 @@ dependencies = [
 dev = ["pytest>=8", "pytest-cov", "ruff>=0.5", "mypy>=1.10"]
 
 [project.scripts]
-anki-cli = "anki_cli.cli:main"
+ankiweb-cli = "ankiweb_cli.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

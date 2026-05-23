@@ -5,7 +5,7 @@ from typing import Any
 
 from anki.collection import Collection
 
-from anki_cli.commands.decks import list_decks
+from ankiweb_cli.commands.decks import list_decks
 
 
 def audit_collection(col: Collection) -> dict[str, Any]:
