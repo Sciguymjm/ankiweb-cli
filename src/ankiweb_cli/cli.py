@@ -8,7 +8,11 @@ from ankiweb_cli import sync as sync_mod
 from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.audit import audit_collection
 from ankiweb_cli.commands.cards import list_cards
-from ankiweb_cli.commands.decks import list_decks
+from ankiweb_cli.commands.decks import (
+    count_cards_in_deck,
+    delete_deck,
+    list_decks,
+)
 from ankiweb_cli.config import Config, load_config, save_config
 from ankiweb_cli.output import emit
 from ankiweb_cli.paths import BACKUPS_DIR, COLLECTION_FILE, CONFIG_FILE, ensure_dirs
@@ -124,6 +128,44 @@ def decks_list() -> None:
         f"{r['name']:<40} {r['card_count']:>6}  new={r['new']} rev={r['review']}"
         for r in rs
     ))
+
+
+@decks.command("delete")
+@click.argument("name")
+@click.option("--recursive", "-r", is_flag=True, help="Delete subdecks too")
+@click.option(
+    "--delete-cards", is_flag=True, help="Delete cards (default: move to Default)"
+)
+@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+@click.option("--yes-really", is_flag=True)
+def decks_delete(
+    name: str, recursive: bool, delete_cards: bool, yes: bool, yes_really: bool
+) -> None:
+    """Delete a deck (and optionally its subdecks/cards)."""
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        card_count = count_cards_in_deck(col, name, recursive=recursive)
+    if card_count is None:
+        emit({"status": "noop", "reason": "deck not found", "deck": name})
+        return
+    if card_count > 50 and not yes_really:
+        raise click.ClickException(
+            f"Deck has {card_count} cards; pass --yes-really to confirm bulk action."
+        )
+    action = "delete cards" if delete_cards else "move cards to Default"
+    if not yes:
+        click.confirm(
+            f"Delete deck '{name}'"
+            f"{' and subdecks' if recursive else ''} "
+            f"({card_count} cards will {action})?",
+            abort=True,
+        )
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="delete"
+    ) as col:
+        result = delete_deck(
+            col, name, recursive=recursive, delete_cards=delete_cards
+        )
+    emit(result)
 
 
 @main.group()
