@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from ankiweb_cli.collection import open_collection
-from ankiweb_cli.commands.cards import add_note, bulk_add_tsv, list_cards
+from ankiweb_cli.commands.cards import add_note, bulk_add_tsv, list_cards, retag_cards
 
 from anki.notes import Note
 
@@ -103,3 +103,39 @@ def test_bulk_add_tsv_column_mismatch_in_errors(tmp_path: Path) -> None:
     assert result["skipped_blank"] == 1
     assert len(result["errors"]) == 1
     assert "line 2" in result["errors"][0]
+
+
+def test_retag_adds_and_removes(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        nt = col.models.by_name("Basic")
+        note = Note(col, nt)
+        note["Front"] = "f"
+        note["Back"] = "b"
+        note.tags = ["old", "keep"]
+        col.add_note(note, col.decks.id("Default"))
+        cid = int(col.db.scalar("select id from cards where nid = ?", note.id))
+
+        result = retag_cards(col, [cid], add=["new"], remove=["old"])
+        assert result["status"] == "ok"
+        assert result["notes_touched"] == 1
+        assert result["notes_changed"] == 1
+        refreshed = col.get_note(note.id)
+        assert set(refreshed.tags) == {"new", "keep"}
+
+
+def test_retag_noop_when_tags_already_match(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        nt = col.models.by_name("Basic")
+        note = Note(col, nt)
+        note["Front"] = "f"
+        note["Back"] = "b"
+        note.tags = ["keep"]
+        col.add_note(note, col.decks.id("Default"))
+        cid = int(col.db.scalar("select id from cards where nid = ?", note.id))
+
+        result = retag_cards(col, [cid], add=["keep"], remove=["absent"])
+        assert result["status"] == "ok"
+        assert result["notes_touched"] == 1
+        assert result["notes_changed"] == 0

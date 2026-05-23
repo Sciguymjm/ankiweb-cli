@@ -104,3 +104,31 @@ def bulk_add_tsv(
         else:
             errors.append(f"line {lineno}: {result.get('reason', 'error')}")
     return {"added": added, "skipped_blank": skipped_blank, "errors": errors}
+
+
+def retag_cards(
+    col: Collection,
+    card_ids: list[int],
+    *,
+    add: list[str],
+    remove: list[str],
+) -> dict[str, Any]:
+    nids: set[int] = {col.get_card(cid).nid for cid in card_ids}
+    add_set = set(add)
+    remove_set = set(remove)
+    changed = 0
+    for nid in nids:
+        note = col.get_note(nid)
+        current = set(note.tags)
+        new_tags = (current | add_set) - remove_set
+        if new_tags != current:
+            note.tags = sorted(new_tags)
+            col.update_note(note)
+            changed += 1
+    return {
+        "status": "ok",
+        "notes_touched": len(nids),
+        "notes_changed": changed,
+        "tags_added": sorted(add_set),
+        "tags_removed": sorted(remove_set),
+    }

@@ -8,7 +8,7 @@ import click
 from ankiweb_cli import sync as sync_mod
 from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.audit import audit_collection
-from ankiweb_cli.commands.cards import add_note, bulk_add_tsv, list_cards
+from ankiweb_cli.commands.cards import add_note, bulk_add_tsv, list_cards, retag_cards
 from ankiweb_cli.commands.decks import (
     count_cards_in_deck,
     delete_deck,
@@ -487,6 +487,37 @@ def cards_add(
         result = add_note(
             col, deck=deck, note_type=note_type, fields=fields, tags=tags
         )
+    emit(result)
+
+
+@cards.command("retag")
+@click.option("--ids", required=True, help="Comma-separated card IDs")
+@click.option("--add", multiple=True, help="Tag to add; repeatable")
+@click.option("--remove", multiple=True, help="Tag to remove; repeatable")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
+def cards_retag(
+    ids: str, add: tuple[str, ...], remove: tuple[str, ...], yes: bool
+) -> None:
+    """Add and/or remove tags on the notes underlying given cards."""
+    if not add and not remove:
+        raise click.ClickException("Provide at least one --add or --remove tag")
+    try:
+        card_ids = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError as e:
+        raise click.ClickException(f"Invalid card IDs: {e}") from e
+    if not card_ids:
+        emit({"status": "noop", "reason": "no card ids"})
+        return
+    if not yes:
+        click.confirm(
+            f"Retag notes for {len(card_ids)} cards "
+            f"(+{list(add)} -{list(remove)})?",
+            abort=True,
+        )
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="cards-retag"
+    ) as col:
+        result = retag_cards(col, card_ids, add=list(add), remove=list(remove))
     emit(result)
 
 
