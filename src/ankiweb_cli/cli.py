@@ -12,6 +12,8 @@ from ankiweb_cli.commands.decks import (
     count_cards_in_deck,
     delete_deck,
     list_decks,
+    suspend_deck,
+    unsuspend_deck,
 )
 from ankiweb_cli.config import Config, load_config, save_config
 from ankiweb_cli.output import emit
@@ -165,6 +167,61 @@ def decks_delete(
         result = delete_deck(
             col, name, recursive=recursive, delete_cards=delete_cards
         )
+    emit(result)
+
+
+@decks.command("suspend")
+@click.argument("name")
+@click.option(
+    "--recursive", "-r", is_flag=True, default=True, help="Include subdecks (default: yes)"
+)
+@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+@click.option("--yes-really", is_flag=True)
+def decks_suspend(name: str, recursive: bool, yes: bool, yes_really: bool) -> None:
+    """Suspend all cards in a deck."""
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        card_count = count_cards_in_deck(col, name, recursive=recursive)
+    if card_count is None:
+        emit({"status": "noop", "reason": "deck not found", "deck": name})
+        return
+    if card_count > 50 and not yes_really:
+        raise click.ClickException(
+            f"Deck has {card_count} cards; pass --yes-really to confirm bulk action."
+        )
+    if not yes:
+        click.confirm(
+            f"Suspend all cards in '{name}'"
+            f"{' (incl. subdecks)' if recursive else ''} ({card_count} cards)?",
+            abort=True,
+        )
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="suspend"
+    ) as col:
+        result = suspend_deck(col, name, recursive=recursive)
+    emit(result)
+
+
+@decks.command("unsuspend")
+@click.argument("name")
+@click.option("--recursive", "-r", is_flag=True, default=True)
+@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+def decks_unsuspend(name: str, recursive: bool, yes: bool) -> None:
+    """Unsuspend all suspended cards in a deck."""
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        card_count = count_cards_in_deck(col, name, recursive=recursive)
+    if card_count is None:
+        emit({"status": "noop", "reason": "deck not found", "deck": name})
+        return
+    if not yes:
+        click.confirm(
+            f"Unsuspend cards in '{name}'"
+            f"{' (incl. subdecks)' if recursive else ''}?",
+            abort=True,
+        )
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="unsuspend"
+    ) as col:
+        result = unsuspend_deck(col, name, recursive=recursive)
     emit(result)
 
 

@@ -1,7 +1,12 @@
 from pathlib import Path
 
 from ankiweb_cli.collection import open_collection
-from ankiweb_cli.commands.decks import delete_deck, list_decks
+from ankiweb_cli.commands.decks import (
+    delete_deck,
+    list_decks,
+    suspend_deck,
+    unsuspend_deck,
+)
 
 from anki.notes import Note
 
@@ -80,3 +85,32 @@ def test_delete_deck_with_cards(tmp_path: Path) -> None:
         assert result["cards_deleted"] is True
         assert before - after == 1
         assert col.decks.id_for_name("Temp") is None
+
+
+def test_suspend_and_unsuspend_deck(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        nid = _add_basic_note(col, "Temp", "f", "b")
+        cid = col.db.scalar("select id from cards where nid = ?", nid)
+        assert cid is not None
+        assert col.get_card(int(cid)).queue != -1
+
+        s = suspend_deck(col, "Temp", recursive=False)
+        assert s["status"] == "ok"
+        assert s["cards_suspended"] == 1
+        assert col.get_card(int(cid)).queue == -1
+
+        s2 = suspend_deck(col, "Temp", recursive=False)
+        assert s2["status"] == "noop"
+
+        u = unsuspend_deck(col, "Temp", recursive=False)
+        assert u["status"] == "ok"
+        assert u["cards_unsuspended"] == 1
+        assert col.get_card(int(cid)).queue != -1
+
+
+def test_suspend_deck_noop_when_missing(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        assert suspend_deck(col, "Nope", recursive=False)["status"] == "noop"
+        assert unsuspend_deck(col, "Nope", recursive=False)["status"] == "noop"

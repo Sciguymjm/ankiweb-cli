@@ -99,3 +99,49 @@ def count_cards_in_deck(col: Collection, name: str, *, recursive: bool) -> int |
     if not decks:
         return None
     return len(_card_ids_for_decks(col, [did for _, did in decks]))
+
+
+def suspend_deck(col: Collection, name: str, *, recursive: bool) -> dict[str, Any]:
+    """Suspend all cards in the deck (and subdecks if recursive)."""
+    decks = _resolve_deck_ids(col, name, recursive=recursive)
+    if not decks:
+        return {"status": "noop", "reason": "deck not found", "deck": name}
+    deck_ids = [did for _, did in decks]
+    rows = col.db.list(
+        f"select id from cards where did in ({','.join('?' for _ in deck_ids)}) "
+        f"and queue != -1",
+        *deck_ids,
+    )
+    card_ids = [int(r) for r in rows]
+    if not card_ids:
+        return {
+            "status": "noop",
+            "reason": "no cards to suspend",
+            "deck": name,
+            "cards_suspended": 0,
+        }
+    col.sched.suspend_cards(card_ids)
+    return {"status": "ok", "deck": name, "cards_suspended": len(card_ids)}
+
+
+def unsuspend_deck(col: Collection, name: str, *, recursive: bool) -> dict[str, Any]:
+    """Unsuspend all cards in the deck (and subdecks if recursive)."""
+    decks = _resolve_deck_ids(col, name, recursive=recursive)
+    if not decks:
+        return {"status": "noop", "reason": "deck not found", "deck": name}
+    deck_ids = [did for _, did in decks]
+    rows = col.db.list(
+        f"select id from cards where did in ({','.join('?' for _ in deck_ids)}) "
+        f"and queue = -1",
+        *deck_ids,
+    )
+    card_ids = [int(r) for r in rows]
+    if not card_ids:
+        return {
+            "status": "noop",
+            "reason": "no suspended cards",
+            "deck": name,
+            "cards_unsuspended": 0,
+        }
+    col.sched.unsuspend_cards(card_ids)
+    return {"status": "ok", "deck": name, "cards_unsuspended": len(card_ids)}
