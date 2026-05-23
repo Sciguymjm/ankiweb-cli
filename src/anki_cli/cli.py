@@ -1,10 +1,14 @@
+import getpass
 import json
 import sys
 
 import click
 
-from anki_cli.config import load_config, save_config
-from anki_cli.paths import CONFIG_FILE, ensure_dirs
+from anki_cli import sync as sync_mod
+from anki_cli.collection import open_collection
+from anki_cli.config import Config, load_config, save_config
+from anki_cli.output import emit
+from anki_cli.paths import BACKUPS_DIR, COLLECTION_FILE, CONFIG_FILE, ensure_dirs
 
 
 @click.group()
@@ -34,6 +38,48 @@ def config_set(key: str, value: str) -> None:
     cfg = load_config(CONFIG_FILE)
     setattr(cfg, key, value)
     save_config(cfg, CONFIG_FILE)
+
+
+@main.command()
+def login() -> None:
+    """Store AnkiWeb password in OS keyring and verify it."""
+    ensure_dirs()
+    cfg = load_config(CONFIG_FILE)
+    if not cfg.username:
+        raise click.ClickException("Run `anki-cli config set username <email>` first.")
+    password = getpass.getpass("AnkiWeb password: ")
+    _, endpoint = sync_mod.login_and_get_hkey(cfg.username, password, cfg.endpoint)
+    sync_mod.store_password(cfg.username, password)
+    save_config(Config(username=cfg.username, endpoint=endpoint), CONFIG_FILE)
+    emit({"ok": True, "endpoint": endpoint})
+
+
+@main.command("sync")
+def sync_cmd() -> None:
+    """Pull from AnkiWeb, push local changes."""
+    ensure_dirs()
+    cfg = load_config(CONFIG_FILE)
+    if not cfg.username:
+        raise click.ClickException("Not configured. Run `anki-cli login` first.")
+    password = sync_mod.get_password(cfg.username)
+    if not password:
+        raise click.ClickException("No password in keyring. Run `anki-cli login`.")
+    hkey, endpoint = sync_mod.login_and_get_hkey(
+        cfg.username, password, cfg.endpoint
+    )
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="sync"
+    ) as col:
+        result = sync_mod.do_sync(col, hkey, endpoint)
+    emit(
+        {
+            "pulled": result.pulled,
+            "pushed": result.pushed,
+            "endpoint": result.new_endpoint or endpoint,
+            "required_full_sync": result.required_full_sync,
+            "server_message": result.server_message,
+        }
+    )
 
 
 if __name__ == "__main__":
