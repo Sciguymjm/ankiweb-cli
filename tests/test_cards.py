@@ -1,7 +1,13 @@
 from pathlib import Path
 
 from ankiweb_cli.collection import open_collection
-from ankiweb_cli.commands.cards import add_note, bulk_add_tsv, list_cards, retag_cards
+from ankiweb_cli.commands.cards import (
+    add_note,
+    bulk_add_tsv,
+    delete_cards,
+    list_cards,
+    retag_cards,
+)
 
 from anki.notes import Note
 
@@ -139,3 +145,32 @@ def test_retag_noop_when_tags_already_match(tmp_path: Path) -> None:
         assert result["status"] == "ok"
         assert result["notes_touched"] == 1
         assert result["notes_changed"] == 0
+
+
+def test_delete_cards(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        nt = col.models.by_name("Basic")
+        note = Note(col, nt)
+        note["Front"] = "f"
+        note["Back"] = "b"
+        col.add_note(note, col.decks.id("Default"))
+        cid = int(col.db.scalar("select id from cards where nid = ?", note.id))
+        before = col.db.scalar("select count() from cards") or 0
+        notes_before = col.db.scalar("select count() from notes") or 0
+
+        result = delete_cards(col, [cid])
+        assert result["status"] == "ok"
+        assert result["deleted"] == 1
+        after = col.db.scalar("select count() from cards") or 0
+        notes_after = col.db.scalar("select count() from notes") or 0
+        assert before - after == 1
+        assert notes_before - notes_after == 1
+
+
+def test_delete_empty_noop(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        result = delete_cards(col, [])
+    assert result["status"] == "noop"
+    assert result["deleted"] == 0

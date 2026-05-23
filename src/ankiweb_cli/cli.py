@@ -8,7 +8,13 @@ import click
 from ankiweb_cli import sync as sync_mod
 from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.audit import audit_collection
-from ankiweb_cli.commands.cards import add_note, bulk_add_tsv, list_cards, retag_cards
+from ankiweb_cli.commands.cards import (
+    add_note,
+    bulk_add_tsv,
+    delete_cards,
+    list_cards,
+    retag_cards,
+)
 from ankiweb_cli.commands.decks import (
     count_cards_in_deck,
     delete_deck,
@@ -518,6 +524,32 @@ def cards_retag(
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="cards-retag"
     ) as col:
         result = retag_cards(col, card_ids, add=list(add), remove=list(remove))
+    emit(result)
+
+
+@cards.command("delete")
+@click.option("--ids", required=True, help="Comma-separated card IDs")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
+@click.option("--yes-really", is_flag=True)
+def cards_delete(ids: str, yes: bool, yes_really: bool) -> None:
+    """Delete cards by ID (orphan notes are removed too)."""
+    try:
+        card_ids = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError as e:
+        raise click.ClickException(f"Invalid card IDs: {e}") from e
+    if not card_ids:
+        emit({"status": "noop", "reason": "no card ids", "deleted": 0})
+        return
+    if len(card_ids) > 50 and not yes_really:
+        raise click.ClickException(
+            f"Deleting {len(card_ids)} cards; pass --yes-really to confirm bulk action."
+        )
+    if not yes:
+        click.confirm(f"Delete {len(card_ids)} cards (and orphan notes)?", abort=True)
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="cards-delete"
+    ) as col:
+        result = delete_cards(col, card_ids)
     emit(result)
 
 

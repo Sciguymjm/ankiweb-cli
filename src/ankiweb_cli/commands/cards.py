@@ -132,3 +132,10 @@ def retag_cards(
         "tags_added": sorted(add_set),
         "tags_removed": sorted(remove_set),
     }
+
+
+def delete_cards(col: Collection, card_ids: list[int]) -> dict[str, Any]:
+    if not card_ids:
+        return {"status": "noop", "reason": "no card ids", "deleted": 0}
+    col.remove_cards_and_orphaned_notes(card_ids)
+    return {"status": "ok", "deleted": len(card_ids)}
