@@ -8,6 +8,7 @@ import click
 from ankiweb_cli import sync as sync_mod
 from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.audit import audit_collection
+from ankiweb_cli.commands.backup import list_backups, restore_backup
 from ankiweb_cli.commands.cards import (
     add_note,
     bulk_add_tsv,
@@ -550,6 +551,37 @@ def cards_delete(ids: str, yes: bool, yes_really: bool) -> None:
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="cards-delete"
     ) as col:
         result = delete_cards(col, card_ids)
+    emit(result)
+
+
+@main.group()
+def backup() -> None:
+    """Manage local backup snapshots."""
+
+
+@backup.command("list")
+def backup_list() -> None:
+    """List backup snapshots, newest first."""
+    rows = list_backups(BACKUPS_DIR)
+    emit(rows, human=lambda rs: "\n".join(
+        f"{r['name']:<60} {r['size']:>10}  op={r['op'] or '-'}"
+        for r in rs
+    ) or "(no backups)")
+
+
+@backup.command("restore")
+@click.argument("name")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
+def backup_restore(name: str, yes: bool) -> None:
+    """Replace the live collection with a backup snapshot."""
+    target = COLLECTION_FILE
+    if not yes:
+        click.confirm(
+            f"Overwrite {target} with backup '{name}'? "
+            "(current collection is snapshotted first)",
+            abort=True,
+        )
+    result = restore_backup(BACKUPS_DIR, name, target)
     emit(result)
 
 
