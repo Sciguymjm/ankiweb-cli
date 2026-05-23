@@ -6,6 +6,7 @@ import click
 
 from anki_cli import sync as sync_mod
 from anki_cli.collection import open_collection
+from anki_cli.commands.audit import audit_collection
 from anki_cli.commands.cards import list_cards
 from anki_cli.commands.decks import list_decks
 from anki_cli.config import Config, load_config, save_config
@@ -115,6 +116,14 @@ def cards_list(query: str, deck: str | None, limit: int) -> None:
     with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
         rows = list_cards(col, query=full_query, limit=limit)
     emit(rows)
+
+
+@main.command("audit")
+def audit_cmd() -> None:
+    """Compute deck/duplicate/note-type audit report."""
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        report = audit_collection(col)
+    emit(report)
 
 
 if __name__ == "__main__":
