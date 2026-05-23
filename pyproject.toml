@@ -33,6 +33,12 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Tests import `ankiweb_cli.collection` before `anki.notes` to warm the import
+# cache; importing `anki.notes` first triggers a circular import inside the
+# upstream `anki` package.
+"tests/*.py" = ["I001"]
+
 [tool.mypy]
 strict = true
 python_version = "3.11"

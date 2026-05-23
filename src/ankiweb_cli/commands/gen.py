@@ -5,10 +5,6 @@ from typing import Any
 from anki.collection import Collection
 
 
-def _notes_using_note_type(col: Collection, ntid: int) -> int:
-    return int(col.db.scalar("select count() from notes where mid = ?", ntid) or 0)
-
-
 def _cards_for_note_type(col: Collection, ntid: int) -> int:
     return int(
         col.db.scalar(

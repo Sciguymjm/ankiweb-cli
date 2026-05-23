@@ -125,6 +125,7 @@ def decks() -> None:
 
 @decks.command("list")
 def decks_list() -> None:
+    """List all decks with card counts and review state."""
     with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
         rows = list_decks(col)
     emit(rows, human=lambda rs: "\n".join(
@@ -139,7 +140,7 @@ def decks_list() -> None:
 @click.option(
     "--delete-cards", is_flag=True, help="Delete cards (default: move to Default)"
 )
-@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
 @click.option("--yes-really", is_flag=True)
 def decks_delete(
     name: str, recursive: bool, delete_cards: bool, yes: bool, yes_really: bool
@@ -176,7 +177,7 @@ def decks_delete(
 @click.option(
     "--recursive", "-r", is_flag=True, default=True, help="Include subdecks (default: yes)"
 )
-@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
 @click.option("--yes-really", is_flag=True)
 def decks_suspend(name: str, recursive: bool, yes: bool, yes_really: bool) -> None:
     """Suspend all cards in a deck."""
@@ -205,7 +206,7 @@ def decks_suspend(name: str, recursive: bool, yes: bool, yes_really: bool) -> No
 @decks.command("unsuspend")
 @click.argument("name")
 @click.option("--recursive", "-r", is_flag=True, default=True)
-@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
 def decks_unsuspend(name: str, recursive: bool, yes: bool) -> None:
     """Unsuspend all suspended cards in a deck."""
     with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
@@ -236,7 +237,7 @@ def gen() -> None:
 @click.option("--front-field", required=True)
 @click.option("--back-field", required=True)
 @click.option("--template-name", default="Reverse")
-@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
 def gen_reverse_cmd(
     deck: str,
     front_field: str,
@@ -284,6 +285,7 @@ def cards() -> None:
 @click.option("--deck", default=None)
 @click.option("--limit", default=50, type=int)
 def cards_list(query: str, deck: str | None, limit: int) -> None:
+    """List cards matching an Anki search query."""
     full_query = query
     if deck:
         full_query = f'deck:"{deck}" {query}'.strip()

@@ -15,22 +15,25 @@ operations on decks and cards.
   headlessly.
 - `decks list`, `cards list`. `cards list` accepts Anki's full search syntax
   (`deck:"X"`, `tag:y`, `is:new`, ...).
+- `decks delete`, `decks suspend`, `decks unsuspend`. Recursive by default for
+  suspend/unsuspend; `--recursive` for delete. Bulk operations require
+  `--yes-really` to confirm.
+- `gen reverse`: add a reverse card template to the note type used by a deck.
+  Anki regenerates cards for existing notes automatically.
 - `audit`: deck inventory, one-direction-only template detection, duplicate
   detection across decks, note-type inventory.
-- Auto-backup before every write. Timestamped `.anki2` snapshots under
-  `backups/`.
+- Auto-backup before every write. Timestamped `.anki2` snapshots.
 - OS keyring for the AnkiWeb password via the `keyring` package. No plaintext
   credentials on disk.
 
-Mutating commands (`decks rename/move/merge/delete`, `cards add/retag/delete`)
-are on the roadmap.
+Still on the roadmap: `decks rename`/`move`/`merge`, `cards add`/`retag`/`delete`.
 
 ## Install
 
 Requires Python 3.11+.
 
 ```bash
-git clone https://github.com/<you>/ankiweb-cli
+git clone https://github.com/Sciguymjm/ankiweb-cli
 cd ankiweb-cli
 python3.11 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
@@ -47,25 +50,33 @@ ankiweb-cli decks list
 ankiweb-cli audit
 ```
 
-After bootstrap, ordinary `ankiweb-cli sync` handles incremental changes in both
-directions.
+After bootstrap, ordinary `ankiweb-cli sync` handles incremental changes in
+both directions.
 
-## Layout
+## Data location
+
+The CLI keeps state in a per-user directory chosen by OS convention:
+
+- Linux/BSD: `$XDG_DATA_HOME/ankiweb-cli` (or `~/.local/share/ankiweb-cli`)
+- macOS: `~/Library/Application Support/ankiweb-cli`
+- Windows: `%APPDATA%\ankiweb-cli`
+
+Override with `ANKIWEB_CLI_HOME=/path/to/dir`. Inside:
 
 ```
-src/ankiweb_cli/         package source
-  cli.py              click entry point
-  collection.py       Collection context manager + auto-backup
-  sync.py             AnkiWeb sync (login, normal, full upload/download)
-  config.py           TOML config load/save
-  paths.py            repo-root-relative path constants
-  output.py           formatted output helper
-  commands/           subcommand implementations (decks, cards, audit)
-
-collection/           your synced collection (gitignored)
-backups/              automatic snapshots (gitignored)
-cache/                generated artifacts (gitignored)
+collection/           your synced collection
+backups/              automatic snapshots (one per mutating operation)
+cache/                generated artifacts
+config.toml           username and endpoint
 ```
+
+## Confirmations
+
+Mutating commands prompt before running. Two ways to skip:
+
+- `--yes` / `ANKIWEB_CLI_YES=1` skips the basic prompt.
+- `--yes-really` is additionally required when an operation affects more than
+  50 cards (deck delete, deck suspend).
 
 ## License
 
@@ -74,5 +85,6 @@ and any program that links it must be AGPL when distributed.
 
 ## Status
 
-Pre-1.0. Sync and read-only commands are implemented and tested. Mutating
-commands are in progress.
+Pre-1.0. Sync, read-only inspection, deck deletion and suspension, and reverse
+template generation are implemented and tested (35+ tests against an isolated
+collection). The remaining mutating commands are next.
