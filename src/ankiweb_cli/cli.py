@@ -1,13 +1,14 @@
 import getpass
 import json
 import sys
+from pathlib import Path
 
 import click
 
 from ankiweb_cli import sync as sync_mod
 from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.audit import audit_collection
-from ankiweb_cli.commands.cards import list_cards
+from ankiweb_cli.commands.cards import add_note, bulk_add_tsv, list_cards
 from ankiweb_cli.commands.decks import (
     count_cards_in_deck,
     delete_deck,
@@ -403,6 +404,90 @@ def cards_list(query: str, deck: str | None, limit: int) -> None:
     with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
         rows = list_cards(col, query=full_query, limit=limit)
     emit(rows)
+
+
+@cards.command("add")
+@click.option("--deck", required=True, help="Destination deck (created if missing)")
+@click.option("--note-type", default="Basic")
+@click.option(
+    "--field",
+    "fields_in",
+    multiple=True,
+    metavar="KEY=VALUE",
+    help="Field assignment, can repeat (e.g. --field Front=hello --field Back=hola)",
+)
+@click.option("--tag", "tags_in", multiple=True, help="Tag to attach; can repeat")
+@click.option(
+    "--from-file",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Bulk add from a TSV file",
+)
+@click.option(
+    "--fields-order",
+    default=None,
+    help="With --from-file: comma-separated field names matching TSV columns",
+)
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
+@click.option("--yes-really", is_flag=True)
+def cards_add(
+    deck: str,
+    note_type: str,
+    fields_in: tuple[str, ...],
+    tags_in: tuple[str, ...],
+    from_file: Path | None,
+    fields_order: str | None,
+    yes: bool,
+    yes_really: bool,
+) -> None:
+    """Add one or more notes (and the cards they generate)."""
+    tags = list(tags_in) if tags_in else None
+    if from_file is not None:
+        if not fields_order:
+            raise click.ClickException("--from-file requires --fields-order")
+        field_names = [f.strip() for f in fields_order.split(",") if f.strip()]
+        line_count = sum(
+            1 for line in from_file.read_text().splitlines() if line.strip()
+        )
+        if line_count > 50 and not yes_really:
+            raise click.ClickException(
+                f"Adding {line_count} notes; pass --yes-really to confirm bulk action."
+            )
+        if not yes:
+            click.confirm(
+                f"Add {line_count} notes from {from_file} to deck '{deck}' "
+                f"using '{note_type}'?",
+                abort=True,
+            )
+        with open_collection(
+            COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="cards-add"
+        ) as col:
+            result = bulk_add_tsv(
+                col,
+                from_file,
+                deck=deck,
+                note_type=note_type,
+                fields=field_names,
+                tags=tags,
+            )
+        emit(result)
+        return
+
+    if not fields_in:
+        raise click.ClickException("Provide at least one --field KEY=VALUE")
+    fields: dict[str, str] = {}
+    for item in fields_in:
+        if "=" not in item:
+            raise click.ClickException(f"Invalid --field (expected KEY=VALUE): {item}")
+        k, v = item.split("=", 1)
+        fields[k] = v
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="cards-add"
+    ) as col:
+        result = add_note(
+            col, deck=deck, note_type=note_type, fields=fields, tags=tags
+        )
+    emit(result)
 
 
 @main.command("audit")
