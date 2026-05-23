@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anki-cli"
+version = "0.1.0"
+description = "Headless CLI for AnkiWeb, optimized for agent use"
+requires-python = ">=3.11"
+dependencies = [
+    "anki>=24.0",
+    "click>=8.1",
+    "keyring>=24.0",
+    "tomli-w>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-cov", "ruff>=0.5", "mypy>=1.10"]
+
+[project.scripts]
+anki-cli = "anki_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
