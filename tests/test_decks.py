@@ -4,6 +4,7 @@ from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.decks import (
     delete_deck,
     list_decks,
+    rename_deck,
     suspend_deck,
     unsuspend_deck,
 )
@@ -114,3 +115,46 @@ def test_suspend_deck_noop_when_missing(tmp_path: Path) -> None:
     with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
         assert suspend_deck(col, "Nope", recursive=False)["status"] == "noop"
         assert unsuspend_deck(col, "Nope", recursive=False)["status"] == "noop"
+
+
+def test_rename_deck(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        _add_basic_note(col, "Foo", "f", "b")
+        old_id = col.decks.id_for_name("Foo")
+        result = rename_deck(col, "Foo", "Bar")
+        assert result["status"] == "ok"
+        assert result["id"] == int(old_id)
+        assert col.decks.id_for_name("Foo") is None
+        assert col.decks.id_for_name("Bar") == old_id
+
+
+def test_rename_target_exists_error(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        _add_basic_note(col, "Foo", "f", "b")
+        _add_basic_note(col, "Bar", "f2", "b2")
+        result = rename_deck(col, "Foo", "Bar")
+        assert result["status"] == "error"
+        assert result["target"] == "Bar"
+        assert col.decks.id_for_name("Foo") is not None
+
+
+def test_rename_missing_noop(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        result = rename_deck(col, "Nope", "Nada")
+        assert result["status"] == "noop"
+
+
+def test_rename_carries_subdecks(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        _add_basic_note(col, "Foo", "f", "b")
+        _add_basic_note(col, "Foo::Bar", "f2", "b2")
+        result = rename_deck(col, "Foo", "Baz")
+        assert result["status"] == "ok"
+        assert col.decks.id_for_name("Foo") is None
+        assert col.decks.id_for_name("Foo::Bar") is None
+        assert col.decks.id_for_name("Baz") is not None
+        assert col.decks.id_for_name("Baz::Bar") is not None

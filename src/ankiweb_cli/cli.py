@@ -12,6 +12,7 @@ from ankiweb_cli.commands.decks import (
     count_cards_in_deck,
     delete_deck,
     list_decks,
+    rename_deck,
     suspend_deck,
     unsuspend_deck,
 )
@@ -224,6 +225,41 @@ def decks_unsuspend(name: str, recursive: bool, yes: bool) -> None:
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="unsuspend"
     ) as col:
         result = unsuspend_deck(col, name, recursive=recursive)
+    emit(result)
+
+
+@decks.command("rename")
+@click.argument("old")
+@click.argument("new")
+@click.option("--dry-run", is_flag=True)
+def decks_rename(old: str, new: str, dry_run: bool) -> None:
+    """Rename a deck (and its subdecks)."""
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        old_id = col.decks.id_for_name(old)
+        if old_id is None:
+            emit({"status": "noop", "reason": "deck not found", "deck": old})
+            return
+        if col.decks.id_for_name(new) is not None:
+            emit({"status": "error", "reason": "target deck exists", "target": new})
+            return
+        if dry_run:
+            prefix = old + "::"
+            subdecks = [
+                d.name for d in col.decks.all_names_and_ids()
+                if d.name.startswith(prefix)
+            ]
+            renames = [(old, new)] + [
+                (s, new + "::" + s[len(prefix):]) for s in subdecks
+            ]
+            emit({
+                "status": "dry-run",
+                "renames": [{"from": a, "to": b} for a, b in renames],
+            })
+            return
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="rename"
+    ) as col:
+        result = rename_deck(col, old, new)
     emit(result)
 
 

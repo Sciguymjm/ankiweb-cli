@@ -124,6 +124,17 @@ def suspend_deck(col: Collection, name: str, *, recursive: bool) -> dict[str, An
     return {"status": "ok", "deck": name, "cards_suspended": len(card_ids)}
 
 
+def rename_deck(col: Collection, old: str, new: str) -> dict[str, Any]:
+    """Rename a deck from `old` to `new`. Subdecks under `old::*` follow automatically."""
+    old_id = col.decks.id_for_name(old)
+    if old_id is None:
+        return {"status": "noop", "reason": "deck not found", "deck": old}
+    if col.decks.id_for_name(new) is not None:
+        return {"status": "error", "reason": "target deck exists", "target": new}
+    col.decks.rename(int(old_id), new)
+    return {"status": "ok", "id": int(old_id), "old": old, "new": new}
+
+
 def unsuspend_deck(col: Collection, name: str, *, recursive: bool) -> dict[str, Any]:
     """Unsuspend all cards in the deck (and subdecks if recursive)."""
     decks = _resolve_deck_ids(col, name, recursive=recursive)
