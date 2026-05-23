@@ -4,6 +4,7 @@ from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.decks import (
     delete_deck,
     list_decks,
+    move_cards,
     rename_deck,
     suspend_deck,
     unsuspend_deck,
@@ -158,3 +159,41 @@ def test_rename_carries_subdecks(tmp_path: Path) -> None:
         assert col.decks.id_for_name("Foo::Bar") is None
         assert col.decks.id_for_name("Baz") is not None
         assert col.decks.id_for_name("Baz::Bar") is not None
+
+
+def test_move_cards(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        nid1 = _add_basic_note(col, "Src", "a", "1")
+        nid2 = _add_basic_note(col, "Src", "b", "2")
+        _add_basic_note(col, "Dst", "c", "3")
+        src_id = col.decks.id("Src")
+        dst_id = col.decks.id("Dst")
+        cids = [
+            int(col.db.scalar("select id from cards where nid = ?", nid1)),
+            int(col.db.scalar("select id from cards where nid = ?", nid2)),
+        ]
+        result = move_cards(col, cids, dst_name="Dst")
+        assert result["status"] == "ok"
+        assert result["moved"] == 2
+        assert col.db.scalar(
+            "select count() from cards where did = ?", src_id
+        ) == 0
+        assert col.db.scalar(
+            "select count() from cards where did = ?", dst_id
+        ) == 3
+
+
+def test_move_creates_destination(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        nid = _add_basic_note(col, "Src", "a", "1")
+        cid = int(col.db.scalar("select id from cards where nid = ?", nid))
+        assert col.decks.id_for_name("Brand::New") is None
+        result = move_cards(col, [cid], dst_name="Brand::New")
+        assert result["status"] == "ok"
+        new_id = col.decks.id_for_name("Brand::New")
+        assert new_id is not None
+        assert col.db.scalar(
+            "select did from cards where id = ?", cid
+        ) == new_id

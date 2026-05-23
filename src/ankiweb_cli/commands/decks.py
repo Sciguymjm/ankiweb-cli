@@ -135,6 +135,17 @@ def rename_deck(col: Collection, old: str, new: str) -> dict[str, Any]:
     return {"status": "ok", "id": int(old_id), "old": old, "new": new}
 
 
+def move_cards(
+    col: Collection, card_ids: list[int], *, dst_name: str
+) -> dict[str, Any]:
+    """Move specific cards to `dst_name`. Creates destination deck if missing."""
+    if not card_ids:
+        return {"status": "noop", "reason": "no card ids", "deck": dst_name}
+    dst_id = col.decks.id(dst_name)
+    col.set_deck(card_ids, dst_id)
+    return {"status": "ok", "moved": len(card_ids), "deck": dst_name}
+
+
 def unsuspend_deck(col: Collection, name: str, *, recursive: bool) -> dict[str, Any]:
     """Unsuspend all cards in the deck (and subdecks if recursive)."""
     decks = _resolve_deck_ids(col, name, recursive=recursive)

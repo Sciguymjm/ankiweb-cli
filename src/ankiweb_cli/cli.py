@@ -12,6 +12,7 @@ from ankiweb_cli.commands.decks import (
     count_cards_in_deck,
     delete_deck,
     list_decks,
+    move_cards,
     rename_deck,
     suspend_deck,
     unsuspend_deck,
@@ -260,6 +261,36 @@ def decks_rename(old: str, new: str, dry_run: bool) -> None:
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="rename"
     ) as col:
         result = rename_deck(col, old, new)
+    emit(result)
+
+
+@decks.command("move")
+@click.option("--ids", required=True, help="Comma-separated card IDs")
+@click.option("--to", "dst", required=True, help="Destination deck (created if missing)")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
+@click.option("--yes-really", is_flag=True)
+def decks_move(ids: str, dst: str, yes: bool, yes_really: bool) -> None:
+    """Move specific cards to another deck."""
+    try:
+        card_ids = [int(x.strip()) for x in ids.split(",") if x.strip()]
+    except ValueError as e:
+        raise click.ClickException(f"Invalid card IDs: {e}") from e
+    if not card_ids:
+        emit({"status": "noop", "reason": "no card ids", "deck": dst})
+        return
+    if len(card_ids) > 50 and not yes_really:
+        raise click.ClickException(
+            f"Moving {len(card_ids)} cards; pass --yes-really to confirm bulk action."
+        )
+    if not yes:
+        click.confirm(
+            f"Move {len(card_ids)} cards to '{dst}'?",
+            abort=True,
+        )
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="move"
+    ) as col:
+        result = move_cards(col, card_ids, dst_name=dst)
     emit(result)
 
 
