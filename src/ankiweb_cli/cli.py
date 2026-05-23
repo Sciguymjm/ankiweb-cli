@@ -15,6 +15,7 @@ from ankiweb_cli.commands.decks import (
     suspend_deck,
     unsuspend_deck,
 )
+from ankiweb_cli.commands.gen import gen_reverse, note_type_for_deck
 from ankiweb_cli.config import Config, load_config, save_config
 from ankiweb_cli.output import emit
 from ankiweb_cli.paths import BACKUPS_DIR, COLLECTION_FILE, CONFIG_FILE, ensure_dirs
@@ -222,6 +223,54 @@ def decks_unsuspend(name: str, recursive: bool, yes: bool) -> None:
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="unsuspend"
     ) as col:
         result = unsuspend_deck(col, name, recursive=recursive)
+    emit(result)
+
+
+@main.group()
+def gen() -> None:
+    """Generators (additive only)."""
+
+
+@gen.command("reverse")
+@click.argument("deck")
+@click.option("--front-field", required=True)
+@click.option("--back-field", required=True)
+@click.option("--template-name", default="Reverse")
+@click.option("--yes", is_flag=True, envvar="ANKI_CLI_YES")
+def gen_reverse_cmd(
+    deck: str,
+    front_field: str,
+    back_field: str,
+    template_name: str,
+    yes: bool,
+) -> None:
+    """Add a reverse card template to the note type used by DECK."""
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        nt = note_type_for_deck(col, deck)
+        if nt is None:
+            emit({"status": "noop", "reason": "deck not found or empty", "deck": deck})
+            return
+        ntid = int(nt["id"])
+        note_count = int(
+            col.db.scalar("select count() from notes where mid = ?", ntid) or 0
+        )
+        nt_name = nt["name"]
+    if not yes:
+        click.confirm(
+            f"Add template '{template_name}' to note type '{nt_name}' "
+            f"(will create ~{note_count} new cards across all notes using this type)?",
+            abort=True,
+        )
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="gen-reverse"
+    ) as col:
+        result = gen_reverse(
+            col,
+            deck=deck,
+            front_field=front_field,
+            back_field=back_field,
+            template_name=template_name,
+        )
     emit(result)
 
 
