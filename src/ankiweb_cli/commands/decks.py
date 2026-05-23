@@ -146,6 +146,43 @@ def move_cards(
     return {"status": "ok", "moved": len(card_ids), "deck": dst_name}
 
 
+def merge_decks(
+    col: Collection, sources: list[str], *, into: str
+) -> dict[str, Any]:
+    """Move all cards from `sources` into `into`, then remove the source decks.
+
+    Sources are matched as exact names (not recursive). Missing sources are
+    silently skipped. If `into` is among the sources, it is not removed.
+    """
+    into_id = int(col.decks.id(into))
+    moved = 0
+    removed: list[str] = []
+    skipped: list[str] = []
+    for src in sources:
+        src_id = col.decks.id_for_name(src)
+        if src_id is None:
+            skipped.append(src)
+            continue
+        src_id = int(src_id)
+        if src_id == into_id:
+            continue
+        cids = _card_ids_for_decks(col, [src_id])
+        if cids:
+            col.set_deck(cids, into_id)
+            moved += len(cids)
+        col.decks.remove([src_id])
+        removed.append(src)
+    result: dict[str, Any] = {
+        "status": "ok",
+        "moved": moved,
+        "into": into,
+        "removed_decks": removed,
+    }
+    if skipped:
+        result["skipped"] = skipped
+    return result
+
+
 def unsuspend_deck(col: Collection, name: str, *, recursive: bool) -> dict[str, Any]:
     """Unsuspend all cards in the deck (and subdecks if recursive)."""
     decks = _resolve_deck_ids(col, name, recursive=recursive)

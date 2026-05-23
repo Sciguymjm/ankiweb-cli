@@ -4,6 +4,7 @@ from ankiweb_cli.collection import open_collection
 from ankiweb_cli.commands.decks import (
     delete_deck,
     list_decks,
+    merge_decks,
     move_cards,
     rename_deck,
     suspend_deck,
@@ -197,3 +198,50 @@ def test_move_creates_destination(tmp_path: Path) -> None:
         assert col.db.scalar(
             "select did from cards where id = ?", cid
         ) == new_id
+
+
+def test_merge_decks(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        _add_basic_note(col, "A", "a1", "1")
+        _add_basic_note(col, "A", "a2", "2")
+        _add_basic_note(col, "B", "b1", "3")
+        result = merge_decks(col, ["A", "B"], into="C")
+        assert result["status"] == "ok"
+        assert result["moved"] == 3
+        assert set(result["removed_decks"]) == {"A", "B"}
+        assert col.decks.id_for_name("A") is None
+        assert col.decks.id_for_name("B") is None
+        c_id = col.decks.id_for_name("C")
+        assert c_id is not None
+        assert col.db.scalar(
+            "select count() from cards where did = ?", c_id
+        ) == 3
+
+
+def test_merge_skips_missing_sources(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        _add_basic_note(col, "A", "a1", "1")
+        result = merge_decks(col, ["A", "Nope"], into="C")
+        assert result["status"] == "ok"
+        assert result["moved"] == 1
+        assert result["removed_decks"] == ["A"]
+        assert result["skipped"] == ["Nope"]
+
+
+def test_merge_into_existing_destination(tmp_path: Path) -> None:
+    col_path = tmp_path / "col.anki2"
+    with open_collection(col_path, backups_dir=tmp_path / "b", write=False) as col:
+        _add_basic_note(col, "A", "a1", "1")
+        _add_basic_note(col, "Dest", "d1", "x")
+        dest_id = col.decks.id("Dest")
+        result = merge_decks(col, ["A", "Dest"], into="Dest")
+        assert result["status"] == "ok"
+        assert result["moved"] == 1
+        assert result["removed_decks"] == ["A"]
+        assert col.decks.id_for_name("A") is None
+        assert col.decks.id_for_name("Dest") == dest_id
+        assert col.db.scalar(
+            "select count() from cards where did = ?", dest_id
+        ) == 2

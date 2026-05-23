@@ -12,6 +12,7 @@ from ankiweb_cli.commands.decks import (
     count_cards_in_deck,
     delete_deck,
     list_decks,
+    merge_decks,
     move_cards,
     rename_deck,
     suspend_deck,
@@ -291,6 +292,49 @@ def decks_move(ids: str, dst: str, yes: bool, yes_really: bool) -> None:
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="move"
     ) as col:
         result = move_cards(col, card_ids, dst_name=dst)
+    emit(result)
+
+
+@decks.command("merge")
+@click.argument("sources", nargs=-1, required=True)
+@click.option("--into", required=True, help="Destination deck (created if missing)")
+@click.option("--yes", is_flag=True, envvar="ANKIWEB_CLI_YES")
+@click.option("--yes-really", is_flag=True)
+def decks_merge(
+    sources: tuple[str, ...], into: str, yes: bool, yes_really: bool
+) -> None:
+    """Merge one or more decks into a destination deck (sources are deleted)."""
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        total = 0
+        found: list[str] = []
+        missing: list[str] = []
+        for src in sources:
+            sid = col.decks.id_for_name(src)
+            if sid is None:
+                missing.append(src)
+                continue
+            found.append(src)
+            total += int(
+                col.db.scalar("select count() from cards where did = ?", int(sid)) or 0
+            )
+    if not found:
+        emit({"status": "noop", "reason": "no source decks found", "skipped": missing})
+        return
+    if total > 50 and not yes_really:
+        raise click.ClickException(
+            f"Merge would move {total} cards; pass --yes-really to confirm bulk action."
+        )
+    if not yes:
+        msg = (
+            f"Merge {found} into '{into}' ({total} cards total)"
+            + (f"; skipping missing: {missing}" if missing else "")
+            + "?"
+        )
+        click.confirm(msg, abort=True)
+    with open_collection(
+        COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="merge"
+    ) as col:
+        result = merge_decks(col, list(sources), into=into)
     emit(result)
 
 
