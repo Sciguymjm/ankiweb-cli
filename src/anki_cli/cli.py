@@ -6,6 +6,7 @@ import click
 
 from anki_cli import sync as sync_mod
 from anki_cli.collection import open_collection
+from anki_cli.commands.cards import list_cards
 from anki_cli.commands.decks import list_decks
 from anki_cli.config import Config, load_config, save_config
 from anki_cli.output import emit
@@ -96,6 +97,24 @@ def decks_list() -> None:
         f"{r['name']:<40} {r['card_count']:>6}  new={r['new']} rev={r['review']}"
         for r in rs
     ))
+
+
+@main.group()
+def cards() -> None:
+    """Operations on cards."""
+
+
+@cards.command("list")
+@click.option("--query", "-q", default="", help="Anki search syntax")
+@click.option("--deck", default=None)
+@click.option("--limit", default=50, type=int)
+def cards_list(query: str, deck: str | None, limit: int) -> None:
+    full_query = query
+    if deck:
+        full_query = f'deck:"{deck}" {query}'.strip()
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        rows = list_cards(col, query=full_query, limit=limit)
+    emit(rows)
 
 
 if __name__ == "__main__":
