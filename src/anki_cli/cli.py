@@ -6,6 +6,7 @@ import click
 
 from anki_cli import sync as sync_mod
 from anki_cli.collection import open_collection
+from anki_cli.commands.decks import list_decks
 from anki_cli.config import Config, load_config, save_config
 from anki_cli.output import emit
 from anki_cli.paths import BACKUPS_DIR, COLLECTION_FILE, CONFIG_FILE, ensure_dirs
@@ -80,6 +81,21 @@ def sync_cmd() -> None:
             "server_message": result.server_message,
         }
     )
+
+
+@main.group()
+def decks() -> None:
+    """Operations on decks."""
+
+
+@decks.command("list")
+def decks_list() -> None:
+    with open_collection(COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=False) as col:
+        rows = list_decks(col)
+    emit(rows, human=lambda rs: "\n".join(
+        f"{r['name']:<40} {r['card_count']:>6}  new={r['new']} rev={r['review']}"
+        for r in rs
+    ))
 
 
 if __name__ == "__main__":
