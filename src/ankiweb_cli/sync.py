@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import shutil
 import tempfile
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import keyring
 from anki.collection import Collection
@@ -46,7 +49,14 @@ def login_and_get_hkey(
             col.close()
 
 
-def do_sync(col: Collection, hkey: str, endpoint: str) -> SyncResult:
+def do_sync(
+    col: Collection,
+    hkey: str,
+    endpoint: str,
+    *,
+    on_media_progress: Callable[[Any], None] | None = None,
+    poll_interval: float = 1.0,
+) -> SyncResult:
     auth = SyncAuth(hkey=hkey, endpoint=endpoint)
     out = col.sync_collection(auth, sync_media=True)
     required_full = out.required in (
@@ -54,6 +64,13 @@ def do_sync(col: Collection, hkey: str, endpoint: str) -> SyncResult:
         SyncCollectionResponse.FULL_DOWNLOAD,
         SyncCollectionResponse.FULL_UPLOAD,
     )
+    # sync_collection kicks off media sync as a background task and returns
+    # immediately. Block until that task finishes so the function only returns
+    # once media is actually on the server.
+    if not required_full:
+        wait_for_media_sync(
+            col, on_progress=on_media_progress, poll_interval=poll_interval
+        )
     return SyncResult(
         pulled=True,
         pushed=True,
@@ -61,6 +78,21 @@ def do_sync(col: Collection, hkey: str, endpoint: str) -> SyncResult:
         required_full_sync=required_full,
         server_message=out.server_message or "",
     )
+
+
+def wait_for_media_sync(
+    col: Collection,
+    *,
+    on_progress: Callable[[Any], None] | None = None,
+    poll_interval: float = 1.0,
+) -> None:
+    while True:
+        status = col.media_sync_status()
+        if on_progress is not None:
+            on_progress(status)
+        if not getattr(status, "active", False):
+            return
+        time.sleep(poll_interval)
 
 
 def do_full_sync(

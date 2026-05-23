@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.1
+
+### Fixed
+
+- `sync` now waits for media transfer to complete before returning. Previously
+  `sync_collection(sync_media=True)` only kicked off media sync as a
+  background task and the command exited while files were still uploading,
+  so MP3s and images added locally appeared "synced" but never made it to
+  AnkiWeb until a subsequent run.
+
+### Added
+
+- `sync` prints media-sync progress (checked / added / removed) to stderr
+  while waiting. Pass `--quiet` to suppress.
+
 ## 0.2.0
 
 Completes the CRUD surface for decks and cards, plus a way to use the

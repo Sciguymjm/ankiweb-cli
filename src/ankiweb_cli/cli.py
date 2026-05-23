@@ -75,6 +75,33 @@ def login() -> None:
     emit({"ok": True, "endpoint": endpoint})
 
 
+def _make_media_progress_printer():
+    """Build a callback that prints media-sync progress lines to stderr, deduped.
+
+    Strips Unicode bidi-isolate marks that Anki's localized progress strings
+    embed, so output is plain ASCII-friendly.
+    """
+    last_msg: list[str | None] = [None]
+    bidi_marks = str.maketrans("", "", "⁨⁩")
+
+    def cb(status) -> None:
+        if not getattr(status, "active", False):
+            return
+        progress = getattr(status, "progress", None)
+        if progress is None:
+            return
+        msg = " | ".join(
+            s.translate(bidi_marks)
+            for s in (progress.checked, progress.added, progress.removed)
+            if s
+        )
+        if msg and msg != last_msg[0]:
+            click.echo(f"media: {msg}", err=True)
+            last_msg[0] = msg
+
+    return cb
+
+
 @main.command("sync")
 @click.option(
     "--full",
@@ -82,7 +109,12 @@ def login() -> None:
     default=None,
     help="Force a full sync in this direction (replaces server or local copy).",
 )
-def sync_cmd(full: str | None) -> None:
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Suppress media-sync progress output on stderr.",
+)
+def sync_cmd(full: str | None, quiet: bool) -> None:
     """Pull from AnkiWeb, push local changes."""
     ensure_dirs()
     cfg = load_config(CONFIG_FILE)
@@ -109,10 +141,13 @@ def sync_cmd(full: str | None) -> None:
         emit(result)
         return
 
+    progress_cb = None if quiet else _make_media_progress_printer()
     with open_collection(
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="sync"
     ) as col:
-        result = sync_mod.do_sync(col, hkey, endpoint)
+        result = sync_mod.do_sync(
+            col, hkey, endpoint, on_media_progress=progress_cb
+        )
     if result.required_full_sync:
         raise click.ClickException(
             "Server requires a full sync. Re-run with `--full download` to pull "
