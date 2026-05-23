@@ -58,7 +58,13 @@ def login() -> None:
 
 
 @main.command("sync")
-def sync_cmd() -> None:
+@click.option(
+    "--full",
+    type=click.Choice(["upload", "download"]),
+    default=None,
+    help="Force a full sync in this direction (replaces server or local copy).",
+)
+def sync_cmd(full: str | None) -> None:
     """Pull from AnkiWeb, push local changes."""
     ensure_dirs()
     cfg = load_config(CONFIG_FILE)
@@ -70,16 +76,36 @@ def sync_cmd() -> None:
     hkey, endpoint = sync_mod.login_and_get_hkey(
         cfg.username, password, cfg.endpoint
     )
+    if endpoint != cfg.endpoint:
+        save_config(Config(username=cfg.username, endpoint=endpoint), CONFIG_FILE)
+
+    if full is not None:
+        result = sync_mod.do_full_sync(
+            COLLECTION_FILE,
+            BACKUPS_DIR,
+            username=cfg.username,
+            password=password,
+            endpoint=cfg.endpoint,
+            upload=(full == "upload"),
+        )
+        emit(result)
+        return
+
     with open_collection(
         COLLECTION_FILE, backups_dir=BACKUPS_DIR, write=True, op="sync"
     ) as col:
         result = sync_mod.do_sync(col, hkey, endpoint)
+    if result.required_full_sync:
+        raise click.ClickException(
+            "Server requires a full sync. Re-run with `--full download` to pull "
+            "the AnkiWeb collection (replacing local) or `--full upload` to push "
+            "local (replacing AnkiWeb)."
+        )
     emit(
         {
             "pulled": result.pulled,
             "pushed": result.pushed,
             "endpoint": result.new_endpoint or endpoint,
-            "required_full_sync": result.required_full_sync,
             "server_message": result.server_message,
         }
     )
